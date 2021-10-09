@@ -1,4 +1,4 @@
-import 'package:letmeserve/letmeserve.dart';
+import 'package:letmeserve/src/request.dart';
 
 class Response {
   final int statusCode;

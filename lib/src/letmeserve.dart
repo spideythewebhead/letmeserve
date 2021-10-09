@@ -115,7 +115,6 @@ class LetMeServe {
       } on Response catch (response) {
         return await _fromApplicationResponse(request.response, response).close();
       } catch (e) {
-        print('response error $e');
         return await common_responses.response500(request.response);
       }
     });
