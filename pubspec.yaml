@@ -1,0 +1,10 @@
+name: letmeserve
+
+environment:
+  sdk: ">=2.13.0 <3.0.0"
+
+dependencies:
+
+dev_dependencies:
+  test: 1.18.2
+  lints: 1.0.1
