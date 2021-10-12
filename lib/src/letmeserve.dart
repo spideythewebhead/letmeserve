@@ -54,40 +54,47 @@ class LetMeServe {
     request.listen((chunk) {
       chunks.add(chunk);
     }, onDone: () async {
-      final routerIndex = _routers.indexWhere((r) => request.uri.path.startsWith(r.prefix));
+      Router? matchRouter;
+      _RouterMethod? methodWrapper;
+      late ClassMirror routerClazz;
 
-      if (routerIndex == -1) {
-        return common_responses.response404(request.response);
+      for (final router in _routers) {
+        if (request.uri.path.startsWith(router.prefix)) {
+          final routerType = router.runtimeType;
+
+          if (!_cacheRouters.containsKey(routerType)) {
+            _cacheRouters[routerType] = reflectClass(routerType);
+          }
+
+          routerClazz = _cacheRouters[routerType]!;
+
+          methodWrapper = _findRouterMethod(
+            method: request.method,
+            path: request.uri.path,
+            prefix: router.prefix,
+            clazz: routerClazz,
+          );
+
+          if (methodWrapper != null) {
+            matchRouter = router;
+            break;
+          }
+        }
       }
 
-      final router = _routers[routerIndex];
-      dynamic body;
-
-      if (request.method != 'GET' && request.headers.contentLength != 0) {
-        body = _getBody(request.headers.contentType?.value ?? '', chunks);
-      }
-
-      final routerType = router.runtimeType;
-      if (!_cacheRouters.containsKey(routerType)) {
-        _cacheRouters[routerType] = reflectClass(routerType);
-      }
-
-      final routerClazz = _cacheRouters[routerType]!;
-
-      final methodWrapper = _findRouterMethod(
-        method: request.method,
-        path: request.uri.path,
-        prefix: router.prefix,
-        clazz: routerClazz,
-      );
-
-      if (methodWrapper == null) {
+      if (matchRouter == null || methodWrapper == null) {
         return common_responses.response404(request.response);
       } else if (!_isFutureResponseSignature(methodWrapper.method.returnType.reflectedType)) {
         return common_responses.response500(request.response);
       }
 
-      final params = _extractParams(request.uri.path, router.prefix + methodWrapper.route.path);
+      dynamic body;
+
+      if (request.method != 'GET' && request.headers.contentLength > 0) {
+        body = _getBody(request.headers.contentType?.value ?? '', chunks);
+      }
+
+      final params = _extractParams(request.uri.path, matchRouter.prefix + methodWrapper.route.path);
       final queryParams = request.uri.queryParameters;
 
       var appRequest = _toApplicationRequest(
@@ -106,7 +113,8 @@ class LetMeServe {
       }
 
       try {
-        Response appResponse = await reflect(router).invoke(methodWrapper.method.simpleName, [appRequest]).reflectee;
+        Response appResponse =
+            await reflect(matchRouter).invoke(methodWrapper.method.simpleName, [appRequest]).reflectee;
         appResponse = appResponse.copyWith(request: appRequest);
 
         appResponse = await _callOnResponseMiddlewares(routerClazz, methodWrapper.method, appResponse);
