@@ -124,6 +124,15 @@ class JsonValidator {
           continue;
         }
 
+        if (value is _EmptyJson) {
+          if (earlyExit) {
+            return onEarlyExit('body', value.reason);
+          }
+
+          addError(validator.path, value.reason);
+          continue;
+        }
+
         if (earlyExit) {
           return onEarlyExit(validator.path, value.reason);
         }
