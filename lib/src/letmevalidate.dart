@@ -1,30 +1,32 @@
 import 'package:letmeserve/src/typedefs.dart';
 
 class JsonValidator {
-  final bool failOnUknownFields;
-
   final _validators = <_BaseValidator>[];
 
-  JsonValidator({
-    this.failOnUknownFields = false,
-  });
+  JsonValidator();
 
   dynamic _extractValue(JsonMap json, String path) {
     if (json.isEmpty) return const _EmptyJson();
 
     final fields = path.split('.');
-    late dynamic value = json;
+    dynamic currentJson = json;
+    dynamic value;
 
     for (final field in fields) {
-      if (value is! JsonMap) {
+      if (currentJson is! JsonMap) {
         return const _FieldNotJsonMap();
       }
 
-      if (!value.containsKey(field)) {
-        return const _UknownField();
+      if (!currentJson.containsKey(field)) {
+        return null;
       }
 
-      value = value[field];
+      if (currentJson[field] == null) {
+        return null;
+      }
+
+      value = currentJson[field];
+      currentJson = currentJson[field];
     }
 
     return value;
@@ -112,18 +114,6 @@ class JsonValidator {
       final value = _extractValue(json, validator.path);
 
       if (value is _JsonError) {
-        if (value is _UknownField) {
-          if (failOnUknownFields) {
-            if (earlyExit) {
-              return onEarlyExit(validator.path, value.reason);
-            }
-
-            addError(validator.path, value.reason);
-          }
-
-          continue;
-        }
-
         if (value is _EmptyJson) {
           if (earlyExit) {
             return onEarlyExit('body', value.reason);
@@ -165,13 +155,6 @@ class _EmptyJson implements _JsonError {
   final String reason;
 
   const _EmptyJson([this.reason = 'json is empty']);
-}
-
-class _UknownField implements _JsonError {
-  @override
-  final String reason;
-
-  const _UknownField([this.reason = 'uknown field']);
 }
 
 class _FieldNotJsonMap implements _JsonError {

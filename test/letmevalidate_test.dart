@@ -152,7 +152,7 @@ void main() {
           },
         };
 
-        final validator = JsonValidator(failOnUknownFields: true)
+        final validator = JsonValidator()
           ..isInt('profile.age')
           ..isString('profile.name')
           ..isDouble('profile.completionPercent');
@@ -167,7 +167,7 @@ void main() {
           'profile': 5,
         };
 
-        final validator = JsonValidator(failOnUknownFields: true)..isInt('profile.age');
+        final validator = JsonValidator()..isInt('profile.age');
 
         final errors = validator.validate(json);
 
