@@ -19,9 +19,9 @@ class LetMeServe {
 
   final _routers = <Router>[];
 
-  final _cacheRouters = <Type, ClassMirror>{};
+  final _cacheRouterClazz = <Type, ClassMirror>{};
 
-  final _cacheMiddlewares = <Type, Middleware>{};
+  final _cacheMiddlewareClazz = <Type, Middleware>{};
 
   late HttpServer _server;
   StreamSubscription? _serverSubscription;
@@ -62,11 +62,11 @@ class LetMeServe {
         if (request.uri.path.startsWith(router.prefix)) {
           final routerType = router.runtimeType;
 
-          if (!_cacheRouters.containsKey(routerType)) {
-            _cacheRouters[routerType] = reflectClass(routerType);
+          if (!_cacheRouterClazz.containsKey(routerType)) {
+            _cacheRouterClazz[routerType] = reflectClass(routerType);
           }
 
-          routerClazz = _cacheRouters[routerType]!;
+          routerClazz = _cacheRouterClazz[routerType]!;
 
           methodWrapper = _findRouterMethod(
             method: request.method,
@@ -139,45 +139,43 @@ class LetMeServe {
     required ClassMirror clazz,
   }) {
     for (final pair in clazz.declarations.entries) {
-      if (pair.value.metadata.isNotEmpty) {
-        for (final meta in pair.value.metadata) {
-          if (meta.reflectee is Route) {
-            final route = meta.reflectee as Route;
+      for (final meta in pair.value.metadata) {
+        if (meta.reflectee is Route) {
+          final route = meta.reflectee as Route;
 
-            if (route.method == method) {
-              /// checks if path is fully matched
+          if (route.method == method) {
+            /// checks if path is fully matched
 
-              final routeParts = (prefix + route.path).split('/');
-              final pathParts = path.split('/');
+            final routeParts = (prefix + route.path).split('/');
+            final pathParts = path.split('/');
 
-              if (routeParts.length != pathParts.length) {
-                continue;
-              }
+            if (routeParts.length != pathParts.length) {
+              continue;
+            }
 
-              var skip = false;
-              for (var p = 0; p < routeParts.length; ++p) {
-                if (routeParts[p].isEmpty) continue;
+            var skip = false;
+            for (var p = 0; p < routeParts.length; ++p) {
+              if (routeParts[p].isEmpty) continue;
 
-                if (routeParts[p][0] == ':') {
-                  if (pathParts[p].isEmpty) {
-                    skip = true;
-                    break;
-                  }
-                } else if (routeParts[p] != pathParts[p]) {
+              if (routeParts[p][0] == ':') {
+                if (pathParts[p].isEmpty) {
                   skip = true;
                   break;
                 }
+              } else if (routeParts[p] != pathParts[p]) {
+                skip = true;
+                break;
               }
-
-              if (skip) {
-                continue;
-              }
-
-              return _RouterMethod(
-                route: route,
-                method: pair.value as MethodMirror,
-              );
             }
+
+            if (skip) {
+              continue;
+            }
+
+            return _RouterMethod(
+              route: route,
+              method: pair.value as MethodMirror,
+            );
           }
         }
       }
@@ -196,12 +194,12 @@ class LetMeServe {
     }
 
     Future<void> onFoundMiddleware(Type middleware) async {
-      if (_cacheMiddlewares[middleware] == null) {
+      if (_cacheMiddlewareClazz[middleware] == null) {
         ClassMirror middlewareClazz = reflectClass(middleware);
-        _cacheMiddlewares[middleware] = middlewareClazz.newInstance(Symbol.empty, const []).reflectee;
+        _cacheMiddlewareClazz[middleware] = middlewareClazz.newInstance(Symbol.empty, const []).reflectee;
       }
 
-      final chainRequest = await _cacheMiddlewares[middleware]!.onRequest(request, onAbort);
+      final chainRequest = await _cacheMiddlewareClazz[middleware]!.onRequest(request, onAbort);
       request = chainRequest!;
     }
 
@@ -234,12 +232,12 @@ class LetMeServe {
     Response response,
   ) async {
     Future<void> onFoundMiddleware(Type middleware) async {
-      if (_cacheMiddlewares[middleware] == null) {
+      if (_cacheMiddlewareClazz[middleware] == null) {
         ClassMirror middlewareClazz = reflectClass(middleware);
-        _cacheMiddlewares[middleware] = middlewareClazz.newInstance(Symbol.empty, const []).reflectee;
+        _cacheMiddlewareClazz[middleware] = middlewareClazz.newInstance(Symbol.empty, const []).reflectee;
       }
 
-      response = await _cacheMiddlewares[middleware]!.onResponse(response);
+      response = await _cacheMiddlewareClazz[middleware]!.onResponse(response);
     }
 
     for (final meta in clazz.metadata) {
